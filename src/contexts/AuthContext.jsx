@@ -1,25 +1,27 @@
-import React, { createContext, useState, useContext, useEffect } from 'react'
-import { auth } from '../firebase/config'
-import { onAuthStateChanged } from 'firebase/auth'
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { AuthProvider } from './contexts/AuthContext';
+import LandingPage from './components/LandingPage';
+import OnboardingPage from './components/OnboardingPage';
+import VerificationPage from './components/VerificationPage';
+import DiscoverPage from './components/DiscoverPage';
+import MatchesPage from './components/MatchesPage';
+import ChatPage from './components/ChatPage';
 
-export const AuthContext = createContext()
-
-export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(null)
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      setUser(user)
-      setLoading(false)
-    })
-
-    return unsubscribe
-  }, [])
-
+function App() {
   return (
-    <AuthContext.Provider value={{ user, loading }}>
-      {!loading && children}
-    </AuthContext.Provider>
-  )
+    <AuthProvider>
+      <BrowserRouter>
+        <Routes>
+          <Route path="/" element={<LandingPage />} />
+          <Route path="/onboarding" element={<OnboardingPage />} />
+          <Route path="/verify" element={<VerificationPage />} />
+          <Route path="/discover" element={<DiscoverPage />} />
+          <Route path="/matches" element={<MatchesPage />} />
+          <Route path="/chat/:matchId" element={<ChatPage />} />
+        </Routes>
+      </BrowserRouter>
+    </AuthProvider>
+  );
 }
+
+export default App;
