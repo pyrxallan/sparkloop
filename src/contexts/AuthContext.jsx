@@ -1,27 +1,29 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { AuthProvider } from './contexts/AuthContext';
-import LandingPage from './components/LandingPage';
-import OnboardingPage from './components/OnboardingPage';
-import VerificationPage from './components/VerificationPage';
-import DiscoverPage from './components/DiscoverPage';
-import MatchesPage from './components/MatchesPage';
-import ChatPage from './components/ChatPage';
+import react from 'react';
+import { AuthProvider } from '../contexts/AuthContext';
 
-function App() {
+export const AuthContext = react.createContext();
+
+export const AuthProviderComponent = ({ children }) => {
+  const [user, setUser] = react.useState(null);
+
+  const login = (userData) => {
+    setUser(userData);
+  };
+
+  const logout = () => {
+    setUser(null);
+  };
+
   return (
-    <AuthProvider>
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<LandingPage />} />
-          <Route path="/onboarding" element={<OnboardingPage />} />
-          <Route path="/verify" element={<VerificationPage />} />
-          <Route path="/discover" element={<DiscoverPage />} />
-          <Route path="/matches" element={<MatchesPage />} />
-          <Route path="/chat/:matchId" element={<ChatPage />} />
-        </Routes>
-      </BrowserRouter>
-    </AuthProvider>
+    <AuthContext.Provider value={{ user, login, logout }}>
+      {children}
+    </AuthContext.Provider>
   );
+};
+export const useAuth = () => {
+  const context = react.useContext(AuthContext);
+  if (context === undefined) {
+    throw new Error('useAuth must be used within an AuthProvider');
+  }
+  return context;
 }
-
-export default App;
