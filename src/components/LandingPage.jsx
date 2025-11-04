@@ -15,7 +15,7 @@ const LandingPage = ({ onSocialLogin }) => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-pink-500 via-purple-500 to-indigo-600">
+    <div className="min-h-screen bg-white">
       <div className="container mx-auto px-4 py-16">
         {/* Hero Section */}
         <div className="text-center text-white mb-16">
