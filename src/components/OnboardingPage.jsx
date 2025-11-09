@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { auth, db } from '../firebase/config';
+import { doc, setDoc } from 'firebase/firestore';
 
 const OnboardingPage = ({ onProfileComplete }) => {
   const navigate = useNavigate();
@@ -11,6 +13,7 @@ const OnboardingPage = ({ onProfileComplete }) => {
   });
 
   const [errors, setErrors] = useState({});
+  const [saving, setSaving] = useState(false);
 
   const validate = () => {
     const newErrors = {};
@@ -22,16 +25,43 @@ const OnboardingPage = ({ onProfileComplete }) => {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = () => {
-    if (validate()) {
-      onProfileComplete(formData);
+  const handleSubmit = async () => {
+    if (!validate()) return;
+    const user = auth.currentUser;
+    if (!user) return;
+    setSaving(true);
+    try {
+      const userRef = doc(db, 'users', user.uid);
+      await setDoc(userRef, {
+        uid: user.uid,
+        displayName: formData.name,
+        age: Number(formData.age),
+        bio: formData.bio,
+        interests: formData.interests,
+        photoURL: user.photoURL || null,
+        email: user.email || null,
+        profileCompleted: true,
+        updatedAt: new Date().toISOString()
+      }, { merge: true });
+
+      onProfileComplete?.({
+        displayName: formData.name,
+        age: Number(formData.age),
+        bio: formData.bio,
+        interests: formData.interests,
+        profileCompleted: true
+      });
       navigate('/verify');
+    } catch (e) {
+      console.error('Onboarding save failed', e);
+      alert('Failed to save profile. Please try again.');
+    } finally {
+      setSaving(false);
     }
   };
 
   const handleChange = (field, value) => {
     setFormData({ ...formData, [field]: value });
-    // Clear error when user starts typing
     if (errors[field]) {
       setErrors({ ...errors, [field]: '' });
     }
@@ -45,7 +75,6 @@ const OnboardingPage = ({ onProfileComplete }) => {
         </h2>
         
         <div className="space-y-4">
-          {/* Name Input */}
           <InputField
             label="Name"
             type="text"
@@ -55,7 +84,6 @@ const OnboardingPage = ({ onProfileComplete }) => {
             placeholder="Enter your name"
           />
 
-          {/* Age Input */}
           <InputField
             label="Age"
             type="number"
@@ -66,7 +94,6 @@ const OnboardingPage = ({ onProfileComplete }) => {
             min="18"
           />
 
-          {/* Bio Textarea */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Bio
@@ -85,12 +112,12 @@ const OnboardingPage = ({ onProfileComplete }) => {
             )}
           </div>
 
-          {/* Submit Button */}
           <button
             onClick={handleSubmit}
-            className="w-full bg-purple-600 text-white py-3 rounded-lg font-semibold hover:bg-purple-700 transition"
+            disabled={saving}
+            className="w-full bg-purple-600 text-white py-3 rounded-lg font-semibold hover:bg-purple-700 transition disabled:opacity-50"
           >
-            Continue to Verification
+            {saving ? 'Saving...' : 'Continue to Verification'}
           </button>
         </div>
       </div>

@@ -1,6 +1,9 @@
 import React, { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Camera, Shield, CheckCircle } from 'lucide-react';
+import { requestCameraAccess, capturePhotoFromVideo, verifyPhoto, stopCameraStream } from '../services/verificationService';
+import { auth, db } from '../firebase/config';
+import { doc, getDoc, updateDoc } from 'firebase/firestore';
 
 const VerificationPage = ({ onVerificationComplete }) => {
   const navigate = useNavigate();
@@ -8,49 +11,83 @@ const VerificationPage = ({ onVerificationComplete }) => {
   const [stream, setStream] = useState(null);
   const [capturing, setCapturing] = useState(false);
   const [verificationStep, setVerificationStep] = useState('idle');
+  const [error, setError] = useState('');
 
   const startCamera = async () => {
     try {
-      const mediaStream = await navigator.mediaDevices.getUserMedia({ 
-        video: { facingMode: 'user' } 
-      });
+      const mediaStream = await requestCameraAccess();
       setStream(mediaStream);
       if (videoRef.current) {
         videoRef.current.srcObject = mediaStream;
       }
       setCapturing(true);
-    } catch (error) {
-      console.error('Camera access denied:', error);
+      setError('');
+    } catch (err) {
+      console.error('Camera access denied:', err);
+      setError('Please allow camera access for verification');
       alert('Please allow camera access for verification');
     }
   };
 
   const capturePhoto = async () => {
-    setVerificationStep('verifying');
-    
-    // Create canvas to capture frame
-    const canvas = document.createElement('canvas');
-    const video = videoRef.current;
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    canvas.getContext('2d').drawImage(video, 0, 0);
-    
-    // Convert to blob
-    canvas.toBlob(async (blob) => {
-      // Here you would call Face++ API
-      // For now, simulate verification
-      setTimeout(() => {
+    try {
+      setVerificationStep('verifying');
+
+      const user = auth.currentUser;
+      if (!user) throw new Error('Not authenticated');
+
+      // Resolve profile photo URL (prefer Firestore user.photoURL, fallback to auth.photoURL)
+      let profilePhotoUrl = null;
+      const userRef = doc(db, 'users', user.uid);
+      const userSnap = await getDoc(userRef);
+      if (userSnap.exists() && userSnap.data()?.photoURL) {
+        profilePhotoUrl = userSnap.data().photoURL;
+      } else if (user.photoURL) {
+        profilePhotoUrl = user.photoURL;
+      }
+      if (!profilePhotoUrl) {
+        throw new Error('No profile photo found. Please add a profile photo during onboarding.');
+      }
+
+      // Fetch profile photo blob
+      const profileResp = await fetch(profilePhotoUrl);
+      const profileBlob = await profileResp.blob();
+
+      // Capture selfie blob
+      const selfieBlob = await capturePhotoFromVideo(videoRef.current);
+
+      // Verify via Face++
+      const result = await verifyPhoto(profileBlob, selfieBlob);
+
+      if (result.success && result.verified) {
+        // Update Firestore user document
+        const userRef = doc(db, 'users', user.uid);
+        await updateDoc(userRef, {
+          verified: true,
+          verifiedAt: new Date().toISOString(),
+          verificationConfidence: result.confidence
+        });
+
         setVerificationStep('verified');
         stopCamera();
         onVerificationComplete({ verified: true, timestamp: Date.now() });
-        setTimeout(() => navigate('/discover'), 2000);
-      }, 2000);
-    }, 'image/jpeg');
+        setTimeout(() => navigate('/discover'), 1200);
+      } else {
+        setVerificationStep('idle');
+        setError(result.message || 'Verification failed. Please try again.');
+        alert(result.message || 'Verification failed. Please try again.');
+      }
+    } catch (err) {
+      console.error('Verification error:', err);
+      setVerificationStep('idle');
+      setError(err.message);
+      alert(err.message);
+    }
   };
 
   const stopCamera = () => {
     if (stream) {
-      stream.getTracks().forEach(track => track.stop());
+      stopCameraStream(stream);
       setStream(null);
       setCapturing(false);
     }
@@ -74,7 +111,6 @@ const VerificationPage = ({ onVerificationComplete }) => {
           </p>
         </div>
 
-        {/* Idle State */}
         {!capturing && verificationStep === 'idle' && (
           <button
             onClick={startCamera}
@@ -85,7 +121,6 @@ const VerificationPage = ({ onVerificationComplete }) => {
           </button>
         )}
 
-        {/* Camera Active */}
         {capturing && verificationStep === 'idle' && (
           <div>
             <video
@@ -111,7 +146,6 @@ const VerificationPage = ({ onVerificationComplete }) => {
           </div>
         )}
 
-        {/* Verifying State */}
         {verificationStep === 'verifying' && (
           <div className="text-center py-8">
             <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-purple-600 mx-auto mb-4"></div>
@@ -122,7 +156,6 @@ const VerificationPage = ({ onVerificationComplete }) => {
           </div>
         )}
 
-        {/* Verified State */}
         {verificationStep === 'verified' && (
           <div className="text-center py-8">
             <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
@@ -133,7 +166,6 @@ const VerificationPage = ({ onVerificationComplete }) => {
           </div>
         )}
 
-        {/* Skip Button */}
         {verificationStep === 'idle' && (
           <button
             onClick={skipVerification}
@@ -141,6 +173,10 @@ const VerificationPage = ({ onVerificationComplete }) => {
           >
             Skip for now
           </button>
+        )}
+
+        {error && (
+          <p className="text-red-600 text-sm mt-4 text-center">{error}</p>
         )}
       </div>
     </div>

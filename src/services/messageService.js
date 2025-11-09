@@ -5,7 +5,9 @@ import {
   where,
   orderBy,
   onSnapshot,
-  serverTimestamp
+  serverTimestamp,
+  getDocs,
+  updateDoc
 } from 'firebase/firestore';
 import { db } from '../firebase/config';
 import { incrementMessageCount } from './matchService';

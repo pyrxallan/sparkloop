@@ -1,59 +1,81 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Heart, X, MessageCircle, Zap } from 'lucide-react';
+import { auth } from '../firebase/config';
+import { getPotentialMatches, createMatch } from '../services/matchService';
 
 const DiscoverPage = ({ matches, onNewMatch }) => {
   const navigate = useNavigate();
   const [currentCardIndex, setCurrentCardIndex] = useState(0);
+  const [potentialMatches, setPotentialMatches] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  const potentialMatches = [
-    {
-      id: 'potential_1',
-      name: 'Jordan Lee',
-      age: 26,
-      bio: 'Foodie & travel enthusiast 🌍',
-      photoUrl: 'https://api.dicebear.com/7.x/avataaars/svg?seed=jordan',
-      interests: ['Cooking', 'Travel', 'Photography']
-    },
-    {
-      id: 'potential_2',
-      name: 'Taylor Park',
-      age: 28,
-      bio: 'Yoga instructor & nature lover 🧘',
-      photoUrl: 'https://api.dicebear.com/7.x/avataaars/svg?seed=taylor',
-      interests: ['Yoga', 'Hiking', 'Meditation']
-    },
-    {
-      id: 'potential_3',
-      name: 'Morgan Smith',
-      age: 25,
-      bio: 'Artist & coffee connoisseur ☕',
-      photoUrl: 'https://api.dicebear.com/7.x/avataaars/svg?seed=morgan',
-      interests: ['Art', 'Coffee', 'Music']
-    }
-  ];
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const uid = auth.currentUser?.uid;
+        if (!uid) return;
+        const potentials = await getPotentialMatches(uid, 10);
+        // Normalize fields for UI
+        setPotentialMatches(potentials.map(u => ({
+          id: u.uid || u.id,
+          name: u.displayName || u.name,
+          age: u.age || u.profile?.age,
+          bio: u.bio || u.profile?.bio || '',
+          photoUrl: u.photoURL || u.photoUrl || u.profile?.photoUrl,
+          interests: u.interests || u.profile?.interests || []
+        })));
+      } catch (e) {
+        console.error('Error loading potential matches', e);
+      } finally {
+        setLoading(false);
+      }
+    };
+    load();
+  }, []);
 
   const currentCard = potentialMatches[currentCardIndex];
 
-  const handleSwipe = (liked) => {
+  const handleSwipe = async (liked) => {
     if (liked && currentCard) {
-      const newMatch = {
-        id: 'match_' + Date.now(),
-        userId: currentCard.id,
-        name: currentCard.name,
-        age: currentCard.age,
-        bio: currentCard.bio,
-        photoUrl: currentCard.photoUrl,
-        matchedAt: Date.now(),
-        expiresAt: Date.now() + 86400000, // 24 hours
-        messageCount: 0,
-        iceBreaker: `Hey! I noticed we both love ${currentCard.interests[0]}. What got you into it?`
-      };
-      onNewMatch(newMatch);
+      try {
+        const uid = auth.currentUser?.uid;
+        if (!uid) return;
+        const match = await createMatch(uid, currentCard.id, {
+          name: currentCard.name,
+          age: currentCard.age,
+          bio: currentCard.bio,
+          photoUrl: currentCard.photoUrl,
+          interests: currentCard.interests
+        });
+        // Normalize for UI components that expect name/photoUrl/etc
+        const uiMatch = {
+          id: match.id,
+          name: currentCard.name,
+          photoUrl: currentCard.photoUrl,
+          iceBreaker: match.iceBreaker,
+          expiresAt: match.expiresAt,
+          messageCount: match.messageCount || 0,
+          user1Id: match.user1Id,
+          user2Id: match.user2Id
+        };
+        onNewMatch?.(uiMatch);
+      } catch (e) {
+        console.error('Error creating match', e);
+      }
     }
-    
-    setCurrentCardIndex((currentCardIndex + 1) % potentialMatches.length);
+    if (potentialMatches.length > 0) {
+      setCurrentCardIndex((currentCardIndex + 1) % potentialMatches.length);
+    }
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
+        <p className="text-gray-600">Loading...</p>
+      </div>
+    );
+  }
 
   if (!currentCard) {
     return (
@@ -65,10 +87,7 @@ const DiscoverPage = ({ matches, onNewMatch }) => {
 
   return (
     <div className="min-h-screen bg-gray-100">
-      {/* Header */}
       <Header matchCount={matches.length} onMatchesClick={() => navigate('/matches')} />
-
-      {/* Profile Card */}
       <div className="container mx-auto px-4 py-8 max-w-md">
         <ProfileCard profile={currentCard} onSwipe={handleSwipe} />
       </div>
@@ -104,13 +123,11 @@ const ProfileCard = ({ profile, onSwipe }) => (
     />
     <div className="p-6">
       <h3 className="text-2xl font-bold mb-2">
-        {profile.name}, {profile.age}
+        {profile.name}{profile.age ? `, ${profile.age}` : ''}
       </h3>
-      <p className="text-gray-600 mb-4">{profile.bio}</p>
-      
-      {/* Interests */}
+      {profile.bio && <p className="text-gray-600 mb-4">{profile.bio}</p>}
       <div className="flex flex-wrap gap-2 mb-6">
-        {profile.interests.map((interest, idx) => (
+        {(profile.interests || []).map((interest, idx) => (
           <span
             key={idx}
             className="bg-purple-100 text-purple-800 px-3 py-1 rounded-full text-sm"
@@ -119,8 +136,6 @@ const ProfileCard = ({ profile, onSwipe }) => (
           </span>
         ))}
       </div>
-      
-      {/* Action Buttons */}
       <div className="flex gap-4">
         <button
           onClick={() => onSwipe(false)}

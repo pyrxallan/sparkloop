@@ -15,10 +15,10 @@ const LandingPage = ({ onSocialLogin }) => {
   };
 
   return (
-    <div className="min-h-screen text-white-800 bg-white">
+    <div className="min-h-screen bg-gradient-to-br from-pink-500 via-purple-500 to-indigo-600">
       <div className="container mx-auto px-4 py-16">
         {/* Hero Section */}
-        <div className="text-center text-gray-800 mb-16">
+        <div className="text-center text-white mb-16">
           <div className="flex items-center justify-center mb-6">
             <Zap className="w-16 h-16 mr-3" />
             <h1 className="text-6xl font-bold">SparkLoop</h1>
@@ -51,7 +51,7 @@ const LandingPage = ({ onSocialLogin }) => {
         <div className="max-w-md mx-auto space-y-4">
           <button
             onClick={() => handleLogin('google')}
-            className="w-full bg-gray-100 text-gray-800 py-4 rounded-xl font-semibold hover:bg-gray-200 transition flex items-center justify-center gap-3"
+            className="w-full bg-white text-gray-800 py-4 rounded-xl font-semibold hover:bg-gray-100 transition flex items-center justify-center gap-3"
           >
             <Users className="w-5 h-5" />
             Continue with Google

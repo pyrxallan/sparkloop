@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from './useAuth'
-import { getMatches } from '../services/matchService'
+import { getUserMatches } from '../services/matchService'
 
 export const useMatches = () => {
   const { user } = useAuth()
@@ -11,7 +11,7 @@ export const useMatches = () => {
     if (user) {
       const fetchMatches = async () => {
         try {
-          const userMatches = await getMatches(user.uid)
+          const userMatches = await getUserMatches(user.uid)
           setMatches(userMatches)
         } catch (error) {
           console.error('Error fetching matches:', error)

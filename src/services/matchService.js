@@ -177,7 +177,8 @@ export const getPotentialMatches = async (userId, limit = 10) => {
   try {
     // Get all users except current user
     const usersRef = collection(db, 'users');
-    const q = query(usersRef, where('uid', '!=', userId));
+    // Firestore requires an orderBy on the same field when using '!='
+    const q = query(usersRef, where('uid', '!=', userId), orderBy('uid'));
     
     const querySnapshot = await getDocs(q);
     const potentialMatches = [];
