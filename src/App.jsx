@@ -19,6 +19,37 @@ function App() {
   const [selectedMatch, setSelectedMatch] = useState(null);
   const [loadingAuth, setLoadingAuth] = useState(true);
   const [matchesUnsub, setMatchesUnsub] = useState(null);
+  const [messages, setMessages] = useState([]);
+
+  // Monitor authentication state
+  useEffect(() => {
+    const unsub = onAuthStateChanged(auth, (firebaseUser) => {
+      setUser(firebaseUser);
+      if (!firebaseUser) {
+        setProfile(null);
+        setMatches([]);
+        setSelectedMatch(null);
+      }
+      setLoadingAuth(false);
+    });
+    return () => unsub();
+  }, []);
+
+  // Fetch user profile when authenticated
+  useEffect(() => {
+    if (user) {
+      const userRef = doc(db, 'users', user.uid);
+      getDoc(userRef).then((snap) => {
+        if (snap.exists()) {
+          setProfile(snap.data());
+        } else {
+          setProfile({ uid: user.uid, email: user.email, displayName: user.displayName, verified: false });
+        }
+      });
+    }
+  }, [user]);
+
+  // Re-monitor authentication state to handle profile fetching
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (firebaseUser) => {
